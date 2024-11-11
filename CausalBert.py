@@ -31,6 +31,7 @@ from sklearn.linear_model import LogisticRegression
 from tqdm import tqdm
 import math
 
+liveloss = PlotLosses(); current_step = 0 # added to display training progress
 CUDA = (torch.cuda.device_count() > 0)
 MASK_IDX = 103
 
@@ -192,25 +193,39 @@ class CausalBertWrapper:
 
 
     def train(self, texts, confounds, treatments, outcomes,
-            learning_rate=2e-5, epochs=3):
+              val_texts, val_confounds, val_treatments, val_outcomes,
+              save_fp, learning_rate=2e-5, epochs=3):
+        # modifications to this function based on code from https://www.cs.rice.edu/~vo9/deep-vislang/
         dataloader = self.build_dataloader(
             texts, confounds, treatments, outcomes)
+        
+        val_dataloader = self.build_dataloader(val_texts, val_confounds, val_treatments, val_outcomes, sampler='sequential')
 
         self.model.train()
+
         optimizer = AdamW(self.model.parameters(), lr=learning_rate, eps=1e-8)
         total_steps = len(dataloader) * epochs
         warmup_steps = total_steps * 0.1
         scheduler = get_linear_schedule_with_warmup(
             optimizer, num_warmup_steps=warmup_steps, num_training_steps=total_steps)
 
+        liveloss = PlotLosses(); current_step = 0
+        best_loss = float("inf")
+
         for epoch in range(epochs):
-            losses = []
+            # training
+            # variables to store and display training progress
+            cumulative_loss = 0
+            num_samples = 0
+            logs = {} # dictionary to store accuracy/loss updates over time
+
             self.model.train()
+
             for step, batch in tqdm(enumerate(dataloader), total=len(dataloader)):
                     if CUDA: 
                         batch = (x.cuda() for x in batch)
                     W_ids, W_len, W_mask, C, T, Y = batch
-                    # while True:
+
                     self.model.zero_grad()
                     g, Q0, Q1, g_loss, Q_loss, mlm_loss = self.model(W_ids, W_len, W_mask, C, T, Y)
                     loss = self.loss_weights['g'] * g_loss + \
@@ -219,11 +234,45 @@ class CausalBertWrapper:
                     loss.backward()
                     optimizer.step()
                     scheduler.step()
-                    losses.append(loss.detach().cpu().item())
-                # print(np.mean(losses))
-                    # if step > 5: continue
-        return self.model
 
+                    # Compute cumulative loss
+                    cumulative_loss += loss.data.sum().item() # .item() converts to number
+                    num_samples += loss.size(0)
+
+            # validation
+            val_cumulative_loss = 0
+            val_num_samples = 0
+
+            self.model.eval()
+
+            for step, batch in tqdm(enumerate(val_dataloader), total=len(val_dataloader)):
+                    if CUDA: 
+                        batch = (x.cuda() for x in batch)
+                    W_ids, W_len, W_mask, C, T, Y = batch
+
+                    g, Q0, Q1, g_loss, Q_loss, mlm_loss = self.model(W_ids, W_len, W_mask, C, T, Y)
+                    loss = self.loss_weights['g'] * g_loss + \
+                            self.loss_weights['Q'] * Q_loss + \
+                            self.loss_weights['mlm'] * mlm_loss
+
+                    # Compute cumulative loss
+                    val_cumulative_loss += loss.data.sum().item() # .item() converts to number
+                    val_num_samples += loss.size(0)
+
+            # show training progress every epoch
+            logs['val_loss'] = val_cumulative_loss / val_num_samples
+            logs['loss'] = cumulative_loss / num_samples
+            liveloss.update(logs, current_step)
+            liveloss.send()
+            current_step += 1
+
+            # Save the parameters for the best accuracy on the validation set so far.
+            # https://pytorch.org/tutorials/beginner/saving_loading_models.html#what-is-a-state-dict
+            if logs['val_loss'] > best_loss:
+                best_loss = logs['val_loss']
+                torch.save(self.model.state_dict(), save_fp) 
+
+        return self.model
 
     def inference(self, texts, confounds, outcome=None):
         self.model.eval()
