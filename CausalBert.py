@@ -31,7 +31,7 @@ from sklearn.linear_model import LogisticRegression
 from tqdm import tqdm
 import math
 
-from livelossplot import PlotLosses()
+from livelossplot import PlotLosses
 CUDA = (torch.cuda.device_count() > 0)
 MASK_IDX = 103
 
