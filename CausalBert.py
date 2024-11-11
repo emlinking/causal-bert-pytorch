@@ -203,7 +203,7 @@ class CausalBertWrapper:
 
         self.model.train()
 
-        optimizer = AdamW(self.model.parameters(), lr=learning_rate, eps=1e-8)
+        optimizer = torch.optim.AdamW(self.model.parameters(), lr=learning_rate, eps=1e-8)
         total_steps = len(dataloader) * epochs
         warmup_steps = total_steps * 0.1
         scheduler = get_linear_schedule_with_warmup(
@@ -222,6 +222,9 @@ class CausalBertWrapper:
             self.model.train()
 
             for step, batch in tqdm(enumerate(dataloader), total=len(dataloader)):
+                for x in batch:
+                    assert not np.any(np.isnan(x))
+                    
                 if CUDA: 
                     batch = (x.cuda() for x in batch)
                 W_ids, W_len, W_mask, C, T, Y = batch
