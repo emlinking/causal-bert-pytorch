@@ -222,22 +222,22 @@ class CausalBertWrapper:
             self.model.train()
 
             for step, batch in tqdm(enumerate(dataloader), total=len(dataloader)):
-                    if CUDA: 
-                        batch = (x.cuda() for x in batch)
-                    W_ids, W_len, W_mask, C, T, Y = batch
+                if CUDA: 
+                    batch = (x.cuda() for x in batch)
+                W_ids, W_len, W_mask, C, T, Y = batch
 
-                    self.model.zero_grad()
-                    g, Q0, Q1, g_loss, Q_loss, mlm_loss = self.model(W_ids, W_len, W_mask, C, T, Y)
-                    loss = self.loss_weights['g'] * g_loss + \
-                            self.loss_weights['Q'] * Q_loss + \
-                            self.loss_weights['mlm'] * mlm_loss
-                    loss.backward()
-                    optimizer.step()
-                    scheduler.step()
+                self.model.zero_grad()
+                g, Q0, Q1, g_loss, Q_loss, mlm_loss = self.model(W_ids, W_len, W_mask, C, T, Y)
+                loss = self.loss_weights['g'] * g_loss + \
+                        self.loss_weights['Q'] * Q_loss + \
+                        self.loss_weights['mlm'] * mlm_loss
+                loss.backward()
+                optimizer.step()
+                scheduler.step()
 
-                    # Compute cumulative loss
-                    cumulative_loss += loss.data.sum().item() # .item() converts to number
-                    num_samples += Y.size(0)
+                # Compute cumulative loss
+                cumulative_loss += loss.data.sum().item() # .item() converts to number
+                num_samples += Y.size(0)
 
             # validation
             val_cumulative_loss = 0
@@ -246,29 +246,33 @@ class CausalBertWrapper:
             self.model.eval()
 
             for step, batch in tqdm(enumerate(val_dataloader), total=len(val_dataloader)):
-                    if CUDA: 
-                        batch = (x.cuda() for x in batch)
-                    W_ids, W_len, W_mask, C, T, Y = batch
+                if CUDA: 
+                    batch = (x.cuda() for x in batch)
+                W_ids, W_len, W_mask, C, T, Y = batch
 
-                    g, Q0, Q1, g_loss, Q_loss, mlm_loss = self.model(W_ids, W_len, W_mask, C, T, Y)
-                    loss = self.loss_weights['g'] * g_loss + \
-                            self.loss_weights['Q'] * Q_loss + \
-                            self.loss_weights['mlm'] * mlm_loss
+                g, Q0, Q1, g_loss, Q_loss, mlm_loss = self.model(W_ids, W_len, W_mask, C, T, Y)
+                loss = self.loss_weights['g'] * g_loss + \
+                        self.loss_weights['Q'] * Q_loss + \
+                        self.loss_weights['mlm'] * mlm_loss
 
-                    # Compute cumulative loss
-                    val_cumulative_loss += loss.data.sum().item() # .item() converts to number
-                    val_num_samples += Y.size(0)
+                # Compute cumulative loss
+                val_cumulative_loss += loss.data.sum().item() # .item() converts to number
+                val_num_samples += Y.size(0)
 
             # show training progress every epoch
             logs['val_loss'] = val_cumulative_loss / val_num_samples
             logs['loss'] = cumulative_loss / num_samples
+            logs['val_cumloss'] = val_cumulative_loss
+            logs['cumloss'] = cumulative_loss
+            logs['samples'] = num_samples
+            logs['val_samples'] = val_num_samples
             liveloss.update(logs, current_step)
             liveloss.send()
             current_step += 1
 
             # Save the parameters for the best accuracy on the validation set so far.
             # https://pytorch.org/tutorials/beginner/saving_loading_models.html#what-is-a-state-dict
-            if logs['val_loss'] > best_loss:
+            if logs['val_loss'] < best_loss:
                 best_loss = logs['val_loss']
                 torch.save(self.model.state_dict(), save_fp) 
 
