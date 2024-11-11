@@ -237,6 +237,9 @@ class CausalBertWrapper:
 
                 # Compute cumulative loss
                 cumulative_loss += loss.data.sum().item() # .item() converts to number
+
+                assert not np.isnan(cumulative_loss)
+
                 num_samples += Y.size(0)
 
             # validation
