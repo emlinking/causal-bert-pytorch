@@ -225,12 +225,6 @@ class CausalBertWrapper:
             self.model.train()
 
             for step, batch in tqdm(enumerate(dataloader), total=len(dataloader)):
-                assert not np.any(np.isnan(batch[0]))
-                assert not np.any(np.isnan(batch[1]))
-                assert not np.any(np.isnan(batch[2]))
-                assert not np.any(np.isnan(batch[3]))
-                assert not np.any(np.isnan(batch[4]))
-                assert not np.any(np.isnan(batch[5]))
 
                 if CUDA: 
                     batch = (x.cuda() for x in batch)
