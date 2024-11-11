@@ -31,7 +31,7 @@ from sklearn.linear_model import LogisticRegression
 from tqdm import tqdm
 import math
 
-liveloss = PlotLosses(); current_step = 0 # added to display training progress
+from livelossplot import PlotLosses()
 CUDA = (torch.cuda.device_count() > 0)
 MASK_IDX = 103
 
