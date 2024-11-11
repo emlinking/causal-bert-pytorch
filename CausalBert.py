@@ -237,7 +237,7 @@ class CausalBertWrapper:
 
                     # Compute cumulative loss
                     cumulative_loss += loss.data.sum().item() # .item() converts to number
-                    num_samples += loss.size(0)
+                    num_samples += Y.size(0)
 
             # validation
             val_cumulative_loss = 0
@@ -257,7 +257,7 @@ class CausalBertWrapper:
 
                     # Compute cumulative loss
                     val_cumulative_loss += loss.data.sum().item() # .item() converts to number
-                    val_num_samples += loss.size(0)
+                    val_num_samples += Y.size(0)
 
             # show training progress every epoch
             logs['val_loss'] = val_cumulative_loss / val_num_samples
