@@ -236,7 +236,7 @@ class CausalBertWrapper:
                 scheduler.step()
 
                 # Compute cumulative loss
-                assert not np.any(np.isnan(loss.data))
+                assert not np.any(np.isnan(loss.data.cpu()))
                 cumulative_loss += loss.data.sum().item() # .item() converts to number
 
                 assert not np.isnan(cumulative_loss)
