@@ -201,9 +201,6 @@ class CausalBertWrapper:
         
         val_dataloader = self.build_dataloader(val_texts, val_confounds, val_treatments, val_outcomes, sampler='sequential')
 
-        print(next(iter(dataloader)), flush=True)
-        print(next(iter(val_dataloader)), flush=True)
-
         self.model.train()
 
         optimizer = torch.optim.AdamW(self.model.parameters(), lr=learning_rate, eps=1e-8)
@@ -240,11 +237,7 @@ class CausalBertWrapper:
                 scheduler.step()
 
                 # Compute cumulative loss
-                print(loss.data, flush=True)
                 cumulative_loss += loss.data.sum().item() # .item() converts to number
-
-                assert not np.isnan(cumulative_loss)
-
                 num_samples += Y.size(0)
 
             # validation
